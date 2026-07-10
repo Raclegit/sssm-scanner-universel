@@ -317,7 +317,7 @@ async function submitPointagePersonnel() {
   const dateStr = now.toISOString().slice(0, 10);      // YYYY-MM-DD
   const heureIso = now.toISOString().slice(0, 16);       // YYYY-MM-DDTHH:MM
   const heure = now.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
-  const heureField = selectedType === 'Entrée' ? "Heure d'entrée" : "Heure de sortie";
+  const heureField = selectedType === 'Entrée' ? "Heure d'entrée théorique" : "Heure de sortie théorique";
 
   try {
     // 1. Chercher une ligne existante pour ce matricule aujourd'hui
