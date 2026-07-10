@@ -1,0 +1,1 @@
+# sssm-scanner-universel
