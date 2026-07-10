@@ -227,17 +227,14 @@ function parseGS1(raw) {
 }
 
 function parseMerchandise(raw) {
-  const gs1 = parseGS1(raw);
-  if (gs1.GTIN || gs1.LOT || gs1.SN) {
-    let expiration = '—';
-    if (gs1.EXP && gs1.EXP.length === 6) {
-      const yy = gs1.EXP.slice(0,2), mm = gs1.EXP.slice(2,4), dd = gs1.EXP.slice(4,6);
-      expiration = (dd === '00' ? '01' : dd) + '/' + mm + '/20' + yy;
-    }
-    return { codeProduit: gs1.GTIN || gs1.CIP || '—', lot: gs1.LOT || '—', expiration, serie: gs1.SN || '—', raw, isGS1: true };
-  }
-  // Pas un GS1 reconnu : QR/EAN simple sur le carton → code produit brut
-  return { codeProduit: raw, lot: '—', expiration: '—', serie: '—', raw, isGS1: false };
+  // On extrait uniquement le GTIN (AI 01, 14 chiffres) qui est fiable et non ambigu.
+  // Lot/Expiration/Série ne sont PAS déduits automatiquement : sur ces cartons, les
+  // champs GS1 variables ne sont pas séparés par un caractère GS détectable, donc un
+  // découpage automatique donnerait de FAUSSES dates de péremption — trop risqué en
+  // pharma. L'agent les saisit manuellement en les lisant sur la boîte.
+  const gtinMatch = raw.match(/^01(\d{14})/);
+  const codeProduit = gtinMatch ? gtinMatch[1] : raw;
+  return { codeProduit, raw };
 }
 
 function handleMerchScan(raw, format) {
@@ -250,13 +247,15 @@ function handleMerchScan(raw, format) {
   document.getElementById('res-label-top').textContent = 'Carton scanné (' + (format || '?') + ')';
   document.getElementById('res-matricule').className = 'res-value success-anim';
   document.getElementById('res-matricule').textContent = m.codeProduit;
-  document.getElementById('res-nom').textContent = 'Lot : ' + m.lot + '   ·   Expiration : ' + m.expiration;
-  document.getElementById('res-service').textContent = 'N° série : ' + m.serie;
+  document.getElementById('res-nom').textContent = 'Complétez le lot et la date de péremption ci-dessous (lus sur la boîte)';
+  document.getElementById('res-service').textContent = '';
   document.getElementById('res-extra').textContent = 'Étape : ' + selectedEtape;
   rz.classList.add('success-anim');
 
   document.getElementById('form-section-m').style.display = 'block';
   document.getElementById('qty-input').value = '';
+  document.getElementById('lot-input').value = '';
+  document.getElementById('exp-input').value = '';
   updateSubmitBtn();
   if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
 }
@@ -264,7 +263,9 @@ function handleMerchScan(raw, format) {
 function updateSubmitBtn() {
   document.getElementById('btn-submit-p').disabled = !(scannedData && selectedType);
   const qty = document.getElementById('qty-input').value;
-  document.getElementById('btn-submit-m').disabled = !(scannedMerch && qty && Number(qty) > 0);
+  const lot = document.getElementById('lot-input').value.trim();
+  const exp = document.getElementById('exp-input').value.trim();
+  document.getElementById('btn-submit-m').disabled = !(scannedMerch && qty && Number(qty) > 0 && lot && exp);
 }
 
 function resetForm() {
@@ -316,7 +317,7 @@ async function submitPointagePersonnel() {
   const dateStr = now.toISOString().slice(0, 10);      // YYYY-MM-DD
   const heureIso = now.toISOString().slice(0, 16);       // YYYY-MM-DDTHH:MM
   const heure = now.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
-  const heureField = selectedType === 'Entrée' ? 'Heure_Entree' : 'Heure_Sortie';
+  const heureField = selectedType === 'Entrée' ? "Heure d'entrée" : "Heure de sortie";
 
   try {
     // 1. Chercher une ligne existante pour ce matricule aujourd'hui
@@ -345,7 +346,7 @@ async function submitPointagePersonnel() {
           "Service":    scannedData.service,
           "Poste":      scannedData.poste || '',
           "Site_Poste": document.getElementById('site-select-p').value,
-          "Saisie_QR":  true,
+          "Saisie par QR Code": true,
           [heureField]: heureIso,
         }}),
       });
@@ -376,9 +377,9 @@ async function submitMouvementStock() {
   const now = new Date();
   const body = { fields: {
     "Code_Produit":     scannedMerch.codeProduit,
-    "Lot":              scannedMerch.lot,
-    "Date_Expiration":  scannedMerch.expiration,
-    "Numero_Serie":     scannedMerch.serie,
+    "Lot":              document.getElementById('lot-input').value.trim(),
+    "Date_Expiration":  document.getElementById('exp-input').value.trim(),
+    "Numero_Serie":     '',
     "Etape":            selectedEtape,
     "Quantite_Boites":  qty,
     "Site_Poste":       document.getElementById('site-select-m').value,
