@@ -320,13 +320,23 @@ async function submitPointagePersonnel() {
   const heureField = selectedType === 'Entrée' ? "Heure d'entrée théorique" : "Heure de sortie théorique";
 
   try {
-    // 1. Chercher une ligne existante pour ce matricule aujourd'hui
-    const formula = encodeURIComponent(`AND({Matricule}='${scannedData.matricule}',{Date}='${dateStr}')`);
-    const searchUrl = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CONFIG.TABLE_PERSONNEL)}?filterByFormula=${formula}&maxRecords=1`;
+    // 1. Chercher les lignes existantes pour ce matricule (les plus récentes),
+    //    puis comparer la date côté code — plus fiable qu'un AND() de formule
+    //    Airtable mêlant texte et champ Date (source du bug précédent).
+    const formula = encodeURIComponent(`{Matricule}='${scannedData.matricule}'`);
+    const searchUrl = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CONFIG.TABLE_PERSONNEL)}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=ID%20Pointage&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=10`;
     const searchResp = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}` } });
-    if (!searchResp.ok) throw new Error('recherche impossible');
+    if (!searchResp.ok) {
+      const errBody = await searchResp.text().catch(() => '');
+      throw new Error('recherche impossible (HTTP ' + searchResp.status + ') ' + errBody.slice(0, 200));
+    }
     const searchData = await searchResp.json();
-    const existing = searchData.records && searchData.records[0];
+    console.log('DEBUG recherche personnel:', { formula: decodeURIComponent(formula), nbTrouve: (searchData.records || []).length, records: searchData.records });
+    const existing = (searchData.records || []).find(r => (r.fields['Date'] || '').slice(0, 10) === dateStr);
+    if (!existing) {
+      showStatus(`DEBUG : ${(searchData.records||[]).length} ligne(s) trouvée(s) pour Matricule='${scannedData.matricule}', aucune pour la date ${dateStr} → création d'une nouvelle ligne`, 'sending');
+      await new Promise(r => setTimeout(r, 2500));
+    }
 
     let resp;
     if (existing) {
