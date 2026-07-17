@@ -144,6 +144,44 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
       <select id="etape-select"></select>
     </div>
   </div>
+  <!-- ── PANNEAU RH — GÉNÉRATION ASP ── -->
+<div id="asp-rh-panel" class="card" style="display:none">
+
+  <!-- Écran de verrouillage PIN -->
+  <div id="asp-pin-gate">
+    <p class="card-title">Accès RH — Code requis</p>
+    <input type="password" id="asp-pin-input" placeholder="Code PIN" inputmode="numeric" maxlength="6" style="width:100%;padding:10px;margin:10px 0;">
+    <button class="btn-scan" onclick="checkRHPin()">Valider</button>
+    <p id="asp-pin-error" style="color:red;display:none;">Code incorrect</p>
+  </div>
+
+  <!-- Formulaire de génération -->
+  <div id="asp-form-container" style="display:none">
+    <p class="card-title">Générer une ASP</p>
+
+    <input type="text" id="asp-matricule" placeholder="Matricule employé" style="width:100%;padding:10px;margin:6px 0;">
+    <input type="text" id="asp-nom" placeholder="Nom complet" style="width:100%;padding:10px;margin:6px 0;">
+
+    <select id="asp-service" style="width:100%;padding:10px;margin:6px 0;">
+      <option value="">-- Service --</option>
+      <option value="Pharmacie">Pharmacie</option>
+      <option value="Logistique">Logistique</option>
+      <option value="Administration">Administration</option>
+    </select>
+
+    <input type="text" id="asp-motif" placeholder="Motif de sortie" style="width:100%;padding:10px;margin:6px 0;">
+    <input type="datetime-local" id="asp-sortie-prevue" style="width:100%;padding:10px;margin:6px 0;">
+    <input type="text" id="asp-autorise-par" placeholder="Votre nom (RH)" style="width:100%;padding:10px;margin:6px 0;">
+
+    <button class="btn-scan" onclick="genererASP()" style="margin-top:10px;">Générer le QR Code ASP</button>
+
+    <div id="asp-qr-result" style="display:none; text-align:center; margin-top:20px;">
+      <div id="asp-qr-canvas"></div>
+      <p id="asp-qr-id"></p>
+      <button class="btn-scan" onclick="resetASPForm()">Nouvelle ASP</button>
+    </div>
+  </div>
+</div>
 
   <button class="btn-scan" id="btn-scan" onclick="startScan()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
