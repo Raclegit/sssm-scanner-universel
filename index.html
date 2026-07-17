@@ -106,7 +106,6 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
 .scan-line{position:absolute;left:5%;width:90%;height:2px;background:#0F2850;animation:scanline 2s linear infinite;box-shadow:0 0 6px #0F2850}
 .warn-box{background:#FFF7E0;border:1.5px solid #E0B03A;border-radius:12px;padding:12px 14px;margin:12px;font-size:12.5px;color:#7A5A00}
 </style>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -130,10 +129,6 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
     📦 Marchandises / Médicaments
   </button>
 </div>
-  <button class="mode-btn" id="mbtn-rh" onclick="setMode('asp-rh')">
-  🔑 RH — Génération ASP
-</button>
-  </div>
 
 <div id="detector-warning" class="warn-box" style="display:none">
   Ce navigateur ne supporte pas la lecture native des DataMatrix. Seuls les QR codes (badges) fonctionneront. Utilisez Chrome à jour sur Android pour scanner les cartons de médicaments.
@@ -236,44 +231,6 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
 <script src="app.js?v=4"></script>
-  <head>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-  <!-- Onglet RH - Génération ASP -->
-<div id="tab-asp-rh" class="tab-content" style="display:none;">
-
-  <!-- Écran de verrouillage PIN -->
-  <div id="asp-pin-gate">
-    <h3>Accès RH — Code requis</h3>
-    <input type="password" id="asp-pin-input" placeholder="Code PIN" inputmode="numeric" maxlength="6">
-    <button onclick="checkRHPin()">Valider</button>
-    <p id="asp-pin-error" style="color:red;display:none;">Code incorrect</p>
-  </div>
-
-  <!-- Formulaire de génération (masqué tant que PIN non validé) -->
-  <div id="asp-form-container" style="display:none;">
-    <h3>Générer une ASP</h3>
-    <input type="text" id="asp-matricule" placeholder="Matricule employé">
-    <input type="text" id="asp-nom" placeholder="Nom complet">
-    <select id="asp-service">
-      <option value="">-- Service --</option>
-      <!-- Adaptez ces options à vos vrais services -->
-      <option value="Pharmacie">Pharmacie</option>
-      <option value="Logistique">Logistique</option>
-      <option value="Administration">Administration</option>
-    </select>
-    <input type="text" id="asp-motif" placeholder="Motif de sortie">
-    <input type="datetime-local" id="asp-sortie-prevue">
-    <input type="text" id="asp-autorise-par" placeholder="Votre nom (RH)">
-
-    <button onclick="genererASP()">Générer le QR Code ASP</button>
-
-    <div id="asp-qr-result" style="display:none;">
-      <div id="asp-qr-canvas"></div>
-      <p id="asp-qr-id"></p>
-      <button onclick="resetASPForm()">Nouvelle ASP</button>
-    </div>
-  </div>
-</div>
 
 </body>
 </html>
