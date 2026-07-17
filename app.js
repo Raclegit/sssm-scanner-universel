@@ -476,3 +476,174 @@ function showStatus(msg, type, withRetry) {
   bar.style.display = 'block';
   if (type === 'ok' || (type === 'fail' && !withRetry)) setTimeout(() => { bar.style.display = 'none'; }, 4000);
 }
+// ==================== MODULE ASP ====================
+
+function checkRHPin() {
+  const input = document.getElementById('asp-pin-input').value;
+  if (input === RH_PIN) {
+    document.getElementById('asp-pin-gate').style.display = 'none';
+    document.getElementById('asp-form-container').style.display = 'block';
+  } else {
+    document.getElementById('asp-pin-error').style.display = 'block';
+  }
+}
+
+function genererIdASP() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let suffix = '';
+  for (let i = 0; i < 6; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+  return 'asp_' + suffix;
+}
+
+async function genererASP() {
+  const matricule = document.getElementById('asp-matricule').value.trim();
+  const nom = document.getElementById('asp-nom').value.trim();
+  const service = document.getElementById('asp-service').value;
+  const motif = document.getElementById('asp-motif').value.trim();
+  const sortiePrevue = document.getElementById('asp-sortie-prevue').value;
+  const autorisePar = document.getElementById('asp-autorise-par').value.trim();
+
+  if (!matricule || !nom || !service || !autorisePar) {
+    alert('Veuillez remplir au minimum : matricule, nom, service, votre nom.');
+    return;
+  }
+
+  const idAsp = genererIdASP();
+
+  const record = {
+    fields: {
+      "ID_ASP": idAsp,
+      "Matricule": matricule,
+      "Nom": nom,
+      "Service": service,
+      "Motif": motif,
+      "Date_Heure_Sortie_Prevue": sortiePrevue ? new Date(sortiePrevue).toISOString() : null,
+      "Statut": ASP_STATUT.AUTORISE,
+      "Autorisé_par": autorisePar
+    }
+  };
+
+  try {
+    const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${ASP_TABLE}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(record)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Erreur Airtable: ${errText}`);
+    }
+
+    const qrContent = `${ASP_QR_PREFIX}MAT:${matricule}|ID:${idAsp}`;
+    afficherQRCode(qrContent, idAsp);
+
+  } catch (err) {
+    console.error(err);
+    alert('Erreur lors de la création de l\'ASP: ' + err.message);
+  }
+}
+
+function afficherQRCode(content, idAsp) {
+  const container = document.getElementById('asp-qr-canvas');
+  container.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  container.appendChild(canvas);
+
+  QRCode.toCanvas(canvas, content, { width: 280 }, function (error) {
+    if (error) console.error(error);
+  });
+
+  document.getElementById('asp-qr-id').textContent = 'ID: ' + idAsp;
+  document.getElementById('asp-qr-result').style.display = 'block';
+}
+
+function resetASPForm() {
+  document.getElementById('asp-matricule').value = '';
+  document.getElementById('asp-nom').value = '';
+  document.getElementById('asp-service').value = '';
+  document.getElementById('asp-motif').value = '';
+  document.getElementById('asp-sortie-prevue').value = '';
+  document.getElementById('asp-qr-result').style.display = 'none';
+}
+
+// ==================== ROUTAGE SCAN ASP ====================
+// À insérer dans votre fonction de routage existante, AVANT le test SALAMA-SSSM/SALAMA
+
+async function handleASPScan(codeContent) {
+  // Format attendu: ASP-SSSM|MAT:12345|ID:asp_a8f3e1
+  const parts = codeContent.split('|');
+  const matricule = parts[1]?.split(':')[1];
+  const idAsp = parts[2]?.split(':')[1];
+
+  if (!idAsp) {
+    afficherErreurScan("QR ASP invalide");
+    return;
+  }
+
+  try {
+    const searchUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${ASP_TABLE}?filterByFormula={ID_ASP}='${idAsp}'`;
+    const res = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` }
+    });
+    const data = await res.json();
+
+    if (!data.records || data.records.length === 0) {
+      afficherErreurScan("ASP introuvable");
+      return;
+    }
+
+    const record = data.records[0];
+    const statutActuel = record.fields.Statut;
+    const now = new Date().toISOString();
+
+    if (statutActuel === ASP_STATUT.AUTORISE) {
+      // Scan de SORTIE
+      await mettreAJourASP(record.id, {
+        "Date_Heure_Sortie_Reelle": now,
+        "Statut": ASP_STATUT.SORTI
+      });
+      afficherSuccesScan(`Sortie enregistrée — ${record.fields.Nom}`);
+
+    } else if (statutActuel === ASP_STATUT.SORTI) {
+      // Scan de RETOUR
+      await mettreAJourASP(record.id, {
+        "Date_Heure_Retour_Reelle": now,
+        "Statut": ASP_STATUT.RENTRE
+      });
+      afficherSuccesScan(`Retour enregistré — ${record.fields.Nom}`);
+
+    } else {
+      // Déjà rentré, expiré, ou annulé
+      afficherErreurScan(`ASP déjà utilisée (statut: ${statutActuel})`);
+    }
+
+  } catch (err) {
+    console.error(err);
+    afficherErreurScan("Erreur lors du traitement de l'ASP");
+  }
+}
+
+async function mettreAJourASP(recordId, fields) {
+  await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${ASP_TABLE}/${recordId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ fields })
+  });
+}
+
+// Fonctions d'affichage — adaptez à vos fonctions UI existantes
+function afficherSuccesScan(message) {
+  // Remplacez par votre logique d'affichage existante (toast, div, etc.)
+  console.log('✅ ' + message);
+}
+
+function afficherErreurScan(message) {
+  console.log('❌ ' + message);
+}
