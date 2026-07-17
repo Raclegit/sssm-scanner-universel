@@ -748,3 +748,100 @@ function resetASPForm() {
   document.getElementById('asp-sortie-prevue').value = '';
   document.getElementById('asp-qr-result').style.display = 'none';
 }
+// ==================== TRAITEMENT SCAN ASP ====================
+
+async function handleASPScan(raw) {
+  const parts = raw.split('|');
+  const idAsp = parts[2]?.split(':')[1];
+
+  const rz = document.getElementById('result-zone');
+  rz.style.display = 'block';
+
+  if (!idAsp) {
+    afficherErreurScanASP('QR ASP invalide');
+    return;
+  }
+
+  try {
+    const formula = encodeURIComponent(`{ID_ASP}='${idAsp}'`);
+    const searchUrl = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(ASP_TABLE)}?filterByFormula=${formula}`;
+    const searchResp = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}` }
+    });
+    if (!searchResp.ok) throw new Error('recherche impossible (HTTP ' + searchResp.status + ')');
+    const searchData = await searchResp.json();
+
+    if (!searchData.records || searchData.records.length === 0) {
+      afficherErreurScanASP('ASP introuvable');
+      return;
+    }
+
+    const record = searchData.records[0];
+    const statutActuel = record.fields.Statut;
+    const now = new Date().toISOString();
+
+    if (statutActuel === ASP_STATUT.AUTORISE) {
+      await mettreAJourASP(record.id, {
+        "Date_Heure_Sortie_Reelle": now,
+        "Statut": ASP_STATUT.SORTI
+      });
+      record.fields.Statut = ASP_STATUT.SORTI;
+      afficherSuccesScanASP(record, 'sortie');
+
+    } else if (statutActuel === ASP_STATUT.SORTI) {
+      await mettreAJourASP(record.id, {
+        "Date_Heure_Retour_Reelle": now,
+        "Statut": ASP_STATUT.RENTRE
+      });
+      record.fields.Statut = ASP_STATUT.RENTRE;
+      afficherSuccesScanASP(record, 'retour');
+
+    } else {
+      afficherErreurScanASP(`ASP déjà utilisée (statut: ${statutActuel})`);
+    }
+
+  } catch (err) {
+    console.error(err);
+    afficherErreurScanASP("Erreur lors du traitement de l'ASP");
+  }
+}
+
+async function mettreAJourASP(recordId, fields) {
+  await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(ASP_TABLE)}/${recordId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ fields })
+  });
+}
+
+function afficherSuccesScanASP(record, typeAction) {
+  const rz = document.getElementById('result-zone');
+  rz.style.display = 'block';
+  rz.className = '';
+  rz.classList.add('success-anim');
+
+  document.getElementById('res-label-top').textContent =
+    typeAction === 'sortie' ? 'ASP — Sortie enregistrée' : 'ASP — Retour enregistré';
+
+  document.getElementById('res-matricule').textContent = 'N° ' + record.fields.Matricule;
+  document.getElementById('res-matricule').className = 'res-value success-anim';
+  document.getElementById('res-nom').textContent = record.fields.Nom;
+  document.getElementById('res-service').textContent = 'Service : ' + record.fields.Service;
+  document.getElementById('res-extra').textContent =
+    'Motif : ' + (record.fields.Motif || '—') + '  ·  → ' + ASP_TABLE;
+}
+
+function afficherErreurScanASP(message) {
+  const rz = document.getElementById('result-zone');
+  rz.style.display = 'block';
+  rz.className = '';
+
+  document.getElementById('res-label-top').textContent = 'ASP — Erreur';
+  document.getElementById('res-matricule').textContent = '—';
+  document.getElementById('res-nom').textContent = message;
+  document.getElementById('res-service').textContent = '';
+  document.getElementById('res-extra').textContent = '';
+}
