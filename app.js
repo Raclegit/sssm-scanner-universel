@@ -649,3 +649,94 @@ function afficherSuccesScan(message) {
 function afficherErreurScan(message) {
   console.log('❌ ' + message);
 }
+// ==================== MODULE ASP — PANNEAU RH ====================
+
+function checkRHPin() {
+  const input = document.getElementById('asp-pin-input').value;
+  if (input === RH_PIN) {
+    document.getElementById('asp-pin-gate').style.display = 'none';
+    document.getElementById('asp-form-container').style.display = 'block';
+  } else {
+    document.getElementById('asp-pin-error').style.display = 'block';
+  }
+}
+
+function genererIdASP() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let suffix = '';
+  for (let i = 0; i < 6; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+  return 'asp_' + suffix;
+}
+
+async function genererASP() {
+  const matricule = document.getElementById('asp-matricule').value.trim();
+  const nom = document.getElementById('asp-nom').value.trim();
+  const service = document.getElementById('asp-service').value;
+  const motif = document.getElementById('asp-motif').value.trim();
+  const sortiePrevue = document.getElementById('asp-sortie-prevue').value;
+  const autorisePar = document.getElementById('asp-autorise-par').value.trim();
+
+  if (!matricule || !nom || !service || !autorisePar) {
+    alert('Veuillez remplir au minimum : matricule, nom, service, votre nom.');
+    return;
+  }
+
+  const idAsp = genererIdASP();
+
+  const record = {
+    fields: {
+      "ID_ASP": idAsp,
+      "Matricule": matricule,
+      "Nom": nom,
+      "Service": service,
+      "Motif": motif,
+      "Date_Heure_Sortie_Prevue": sortiePrevue ? new Date(sortiePrevue).toISOString() : null,
+      "Statut": ASP_STATUT.AUTORISE,
+      "Autorisé_par": autorisePar
+    }
+  };
+
+  try {
+    const response = await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(ASP_TABLE)}`,  {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(record)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText);
+    }
+
+    const qrContent = `${ASP_QR_PREFIX}MAT:${matricule}|ID:${idAsp}`;
+    afficherQRCode(qrContent, idAsp);
+
+  } catch (err) {
+    console.error(err);
+    alert('Erreur lors de la création de l\'ASP: ' + err.message);
+  }
+}
+
+function afficherQRCode(content, idAsp) {
+  const container = document.getElementById('asp-qr-canvas');
+  container.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  container.appendChild(canvas);
+  QRCode.toCanvas(canvas, content, { width: 240 }, function (error) {
+    if (error) console.error(error);
+  });
+  document.getElementById('asp-qr-id').textContent = 'ID: ' + idAsp;
+  document.getElementById('asp-qr-result').style.display = 'block';
+}
+
+function resetASPForm() {
+  document.getElementById('asp-matricule').value = '';
+  document.getElementById('asp-nom').value = '';
+  document.getElementById('asp-service').value = '';
+  document.getElementById('asp-motif').value = '';
+  document.getElementById('asp-sortie-prevue').value = '';
+  document.getElementById('asp-qr-result').style.display = 'none';
+}
