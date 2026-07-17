@@ -28,7 +28,7 @@ const ASP_TABLE = "ASP_SORTIES";
 const ASP_QR_PREFIX = "ASP-SSSM|";
 
 // PIN simple pour protéger l'accès RH (à changer selon votre préférence)
-const RH_PIN = "2026";
+const RH_PIN = "916574";
 
 // Statuts possibles (doivent correspondre EXACTEMENT aux options Single select créées)
 const ASP_STATUT = {
