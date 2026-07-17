@@ -64,6 +64,8 @@ function setMode(mode) {
   document.getElementById('scan-hint').textContent = mode === 'marchandise' ? 'Centrer le DataMatrix / code-barres / QR' : 'Centrer le QR Code dans le cadre';
   document.getElementById('form-section-p').style.display = 'none';
   document.getElementById('form-section-m').style.display = 'none';
+  document.querySelector('.card').style.display = mode === 'asp-rh' ? 'none' : 'block';
+  document.getElementById('asp-rh-panel').style.display = mode === 'asp-rh' ? 'block' : 'none';
 }
 
 // ── SCANNER (caméra) ─────────────────────────────────────────────
