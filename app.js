@@ -326,17 +326,9 @@ async function submitPointagePersonnel() {
     const formula = encodeURIComponent(`{Matricule}='${scannedData.matricule}'`);
     const searchUrl = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CONFIG.TABLE_PERSONNEL)}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=ID%20Pointage&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=10`;
     const searchResp = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}` } });
-    if (!searchResp.ok) {
-      const errBody = await searchResp.text().catch(() => '');
-      throw new Error('recherche impossible (HTTP ' + searchResp.status + ') ' + errBody.slice(0, 200));
-    }
+    if (!searchResp.ok) throw new Error('recherche impossible (HTTP ' + searchResp.status + ')');
     const searchData = await searchResp.json();
-    console.log('DEBUG recherche personnel:', { formula: decodeURIComponent(formula), nbTrouve: (searchData.records || []).length, records: searchData.records });
     const existing = (searchData.records || []).find(r => (r.fields['Date'] || '').slice(0, 10) === dateStr);
-    if (!existing) {
-      showStatus(`DEBUG : ${(searchData.records||[]).length} ligne(s) trouvée(s) pour Matricule='${scannedData.matricule}', aucune pour la date ${dateStr} → création d'une nouvelle ligne`, 'sending');
-      await new Promise(r => setTimeout(r, 2500));
-    }
 
     let resp;
     if (existing) {
