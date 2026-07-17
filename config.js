@@ -16,13 +16,20 @@ const CONFIG = {
   AIRTABLE_BASE_ID : "appiu2JDZyyjFnNth",
   TABLE_SSSM       : "SSSM_MOUVEMENTS",
   TABLE_PERSONNEL  : "POINTAGES_PERSONNEL",
+  TABLE_STOCK      : "SSSM_STOCK_MOUVEMENTS",
+  SITE_OPTIONS     : ["SIÈGE", "Entrepôt", "Périmètre", "Parking", "Autre"],
+  ETAPE_OPTIONS    : ["Réception", "Préparation Rayon", "Expédition / Livraison"],
+  HEURE_ENTREE     : "07:30",
+  TOLERANCE_MIN    : 15,
 };
 
 // --- Configuration ASP ---
 const ASP_TABLE = "ASP_SORTIES";
 const ASP_QR_PREFIX = "ASP-SSSM|";
+
 // PIN simple pour protéger l'accès RH (à changer selon votre préférence)
-const RH_PIN ASP_STATUT = "RH_2026";
+const RH_PIN = "RH_2026";
+
 // Statuts possibles (doivent correspondre EXACTEMENT aux options Single select créées)
 const ASP_STATUT = {
   AUTORISE: "Autorisé",
@@ -30,10 +37,4 @@ const ASP_STATUT = {
   RENTRE: "Rentré",
   EXPIRE: "Expiré",
   ANNULE: "Annulé"
-};
-  TABLE_STOCK      : "SSSM_STOCK_MOUVEMENTS",
-  SITE_OPTIONS     : ["SIÈGE", "Entrepôt", "Périmètre", "Parking", "Autre"],
-  ETAPE_OPTIONS    : ["Réception", "Préparation Rayon", "Expédition / Livraison"],
-  HEURE_ENTREE     : "07:30",
-  TOLERANCE_MIN    : 15,
 };
