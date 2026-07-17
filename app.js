@@ -130,8 +130,16 @@ function resetResultZone() {
 // ── ROUTAGE DU SCAN SELON LE MODE ───────────────────────────────
 function handleScan(raw, format) {
   stopScan();
+
+  // Interception ASP, prioritaire sur le mode courant
+  if (raw.startsWith(ASP_QR_PREFIX)) {
+    handleASPScan(raw);
+    return;
+  }
+
   if (currentMode === 'personnel') handleBadgeScan(raw);
   else handleMerchScan(raw, format);
+}
 }
 
 // ── TRAITEMENT BADGE (personnel) ────────────────────────────────
