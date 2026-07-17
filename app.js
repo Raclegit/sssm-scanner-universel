@@ -723,19 +723,6 @@ async function genererASP() {
     alert('Erreur lors de la création de l\'ASP: ' + err.message);
   }
 }
-
-function afficherQRCode(content, idAsp) {
-  const container = document.getElementById('asp-qr-canvas');
-  container.innerHTML = '';
-  const canvas = document.createElement('canvas');
-  container.appendChild(canvas);
-  QRCode.toCanvas(canvas, content, { width: 240 }, function (error) {
-    if (error) console.error(error);
-  });
-  document.getElementById('asp-qr-id').textContent = 'ID: ' + idAsp;
-  document.getElementById('asp-qr-result').style.display = 'block';
-}
-
 function resetASPForm() {
   document.getElementById('asp-matricule').value = '';
   document.getElementById('asp-nom').value = '';
