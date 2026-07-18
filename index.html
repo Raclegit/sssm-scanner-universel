@@ -266,7 +266,52 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
     </div>
   </div>
 </div>
+</div>
 
+<!-- ── PANNEAU RH — CONGÉS (CPS) ── -->
+<div id="cps-rh-panel" class="card" style="display:none">
+
+  <p class="card-title">Créer une demande de congé</p>
+
+  <input type="text" id="cps-matricule" placeholder="Matricule employé" style="width:100%;padding:10px;margin:6px 0;" oninput="rechercherSoldeCPS()">
+  <input type="text" id="cps-nom" placeholder="Nom complet" style="width:100%;padding:10px;margin:6px 0;">
+
+  <select id="cps-service" style="width:100%;padding:10px;margin:6px 0;">
+    <option value="">-- Service --</option>
+    <option value="DG">DG</option>
+    <option value="DAF">DAF</option>
+    <option value="DAS">DAS</option>
+    <option value="DVM">DVM</option>
+    <option value="PR">PR</option>
+  </select>
+
+  <!-- Affichage du solde en direct -->
+  <div id="cps-solde-info" style="display:none; background:#EAF6EA; border:1.5px solid #3AAA35; border-radius:10px; padding:12px; margin:10px 0; font-size:14px;">
+    <strong>Solde disponible : <span id="cps-solde-valeur">—</span> jours</strong>
+  </div>
+  <div id="cps-solde-absent" style="display:none; background:#FFF7E0; border:1.5px solid #E0B03A; border-radius:10px; padding:12px; margin:10px 0; font-size:13px; color:#7A5A00;">
+    Aucun solde trouvé pour ce matricule. Créez-le d'abord dans CPS_SOLDES.
+  </div>
+
+  <label style="display:block;font-size:13px;font-weight:600;color:#555;margin:10px 0 4px">Date de départ souhaitée</label>
+  <input type="datetime-local" id="cps-depart-prevue" style="width:100%;padding:10px;margin:6px 0;">
+
+  <label style="display:block;font-size:13px;font-weight:600;color:#555;margin:10px 0 4px">Date de retour souhaitée</label>
+  <input type="datetime-local" id="cps-retour-prevue" style="width:100%;padding:10px;margin:6px 0;">
+
+  <input type="text" id="cps-autorise-par" placeholder="Votre nom (RH)" style="width:100%;padding:10px;margin:6px 0;">
+
+  <button class="btn-scan" onclick="genererCPS()" style="margin-top:10px;">Générer le QR Code Congé</button>
+
+  <div id="cps-qr-result" style="display:none; text-align:center; margin-top:20px;">
+    <div id="cps-qr-canvas"></div>
+    <p id="cps-qr-id"></p>
+    <button class="btn-scan" onclick="resetCPSForm()">Nouvelle demande</button>
+  </div>
+</div>
+
+<div class="card">
+  <p class="card-title">Scans de la session</p>
 <div class="card">
   <p class="card-title">Scans de la session</p>
   <div id="history-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:16px 0">Aucun scan enregistré</p></div>
