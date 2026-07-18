@@ -636,7 +636,7 @@ async function handleASPScan(raw) {
 }
 
 async function mettreAJourASP(recordId, fields) {
-  await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(ASP_TABLE)}/${recordId}`, {
+  const resp = await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(ASP_TABLE)}/${recordId}`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
@@ -644,6 +644,10 @@ async function mettreAJourASP(recordId, fields) {
     },
     body: JSON.stringify({ fields })
   });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(errText);
+  }
 }
 
 function afficherSuccesScanASP(record, typeAction) {
