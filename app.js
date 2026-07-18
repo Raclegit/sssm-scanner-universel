@@ -811,3 +811,157 @@ function resetCPSForm() {
   document.getElementById('cps-solde-absent').style.display = 'none';
   document.getElementById('cps-qr-result').style.display = 'none';
 }
+// ==================== TRAITEMENT SCAN CPS ====================
+
+let cpsScanEnCours = false;
+
+async function handleCPSScan(raw) {
+  if (cpsScanEnCours) return;
+  cpsScanEnCours = true;
+
+  try {
+    const parts = raw.split('|');
+    const idCps = parts[2]?.split(':')[1];
+
+    const rz = document.getElementById('result-zone');
+    rz.style.display = 'block';
+
+    if (!idCps) {
+      afficherErreurScanCPS('QR Congé invalide');
+      return;
+    }
+
+    const formula = encodeURIComponent(`{ID_CPS}='${idCps}'`);
+    const searchUrl = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CPS_CONGES_TABLE)}?filterByFormula=${formula}`;
+    const searchResp = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}` }
+    });
+    if (!searchResp.ok) throw new Error('recherche impossible (HTTP ' + searchResp.status + ')');
+    const searchData = await searchResp.json();
+
+    if (!searchData.records || searchData.records.length === 0) {
+      afficherErreurScanCPS('Congé introuvable');
+      return;
+    }
+
+    const record = searchData.records[0];
+    const statutActuel = record.fields.Statut;
+    const now = new Date().toISOString();
+
+    if (statutActuel === CPS_STATUT.AUTORISE) {
+      // Scan DÉPART
+      await mettreAJourCPS(record.id, {
+        "Date_Depart_Reelle": now,
+        "Statut": CPS_STATUT.EN_CONGE
+      });
+      record.fields.Statut = CPS_STATUT.EN_CONGE;
+      afficherSuccesScanCPS(record, 'depart');
+
+    } else if (statutActuel === CPS_STATUT.EN_CONGE) {
+      // Scan RETOUR — calcul des jours pris + mise à jour du solde
+      const dateDepart = new Date(record.fields.Date_Depart_Reelle);
+      const dateRetour = new Date(now);
+      const joursPris = Math.round((dateRetour - dateDepart) / (1000 * 60 * 60 * 24) * 10) / 10;
+
+      await mettreAJourCPS(record.id, {
+        "Date_Retour_Reelle": now,
+        "Statut": CPS_STATUT.TERMINE,
+        "Jours_Pris": joursPris
+      });
+
+      await mettreAJourSoldeCPS(record.fields.Matricule, joursPris);
+
+      record.fields.Statut = CPS_STATUT.TERMINE;
+      record.fields.Jours_Pris = joursPris;
+      afficherSuccesScanCPS(record, 'retour');
+
+    } else {
+      afficherErreurScanCPS(`Congé déjà utilisé (statut: ${statutActuel})`);
+    }
+
+  } catch (err) {
+    console.error(err);
+    afficherErreurScanCPS("Erreur lors du traitement du congé");
+  } finally {
+    cpsScanEnCours = false;
+  }
+}
+
+async function mettreAJourCPS(recordId, fields) {
+  const resp = await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CPS_CONGES_TABLE)}/${recordId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ fields })
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(errText);
+  }
+}
+
+async function mettreAJourSoldeCPS(matricule, joursAjoutes) {
+  // Recherche l'enregistrement du solde de l'employé
+  const formula = encodeURIComponent(`{Matricule}='${matricule}'`);
+  const url = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CPS_SOLDES_TABLE)}?filterByFormula=${formula}`;
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}` }
+  });
+  if (!res.ok) throw new Error('recherche solde impossible');
+  const data = await res.json();
+
+  if (!data.records || data.records.length === 0) {
+    console.error('Aucun solde trouvé pour la mise à jour du matricule ' + matricule);
+    return;
+  }
+
+  const soldeRecord = data.records[0];
+  const cumulActuel = soldeRecord.fields.Jours_Consommes_Cumules || 0;
+  const nouveauCumul = cumulActuel + joursAjoutes;
+
+  const updateResp = await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CPS_SOLDES_TABLE)}/${soldeRecord.id}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ fields: { "Jours_Consommes_Cumules": nouveauCumul } })
+  });
+  if (!updateResp.ok) {
+    const errText = await updateResp.text();
+    throw new Error(errText);
+  }
+}
+
+function afficherSuccesScanCPS(record, typeAction) {
+  const rz = document.getElementById('result-zone');
+  rz.style.display = 'block';
+  rz.className = '';
+  rz.classList.add('success-anim');
+
+  document.getElementById('res-label-top').textContent =
+    typeAction === 'depart' ? 'CPS — Départ en congé' : 'CPS — Retour de congé';
+
+  document.getElementById('res-matricule').textContent = 'N° ' + record.fields.Matricule;
+  document.getElementById('res-matricule').className = 'res-value success-anim';
+  document.getElementById('res-nom').textContent = record.fields.Nom;
+  document.getElementById('res-service').textContent = 'Service : ' + record.fields.Service;
+  document.getElementById('res-extra').textContent =
+    typeAction === 'retour'
+      ? `Jours pris : ${record.fields.Jours_Pris} · → ${CPS_CONGES_TABLE}`
+      : `→ ${CPS_CONGES_TABLE}`;
+}
+
+function afficherErreurScanCPS(message) {
+  const rz = document.getElementById('result-zone');
+  rz.style.display = 'block';
+  rz.className = '';
+
+  document.getElementById('res-label-top').textContent = 'CPS — Erreur';
+  document.getElementById('res-matricule').textContent = '—';
+  document.getElementById('res-nom').textContent = message;
+  document.getElementById('res-service').textContent = '';
+  document.getElementById('res-extra').textContent = '';
+}
