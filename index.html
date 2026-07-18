@@ -59,7 +59,8 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
 .sc-tr{top:-2px;right:-2px;border-width:3px 3px 0 0;border-radius:0 4px 0 0}
 .sc-bl{bottom:-2px;left:-2px;border-width:0 0 3px 3px;border-radius:0 0 0 4px}
 .sc-br{bottom:-2px;right:-2px;border-width:0 3px 3px 0;border-radius:0 0 4px 0}
-.scan-hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:white;font-size:12px;padding:5px 12px;border-radius:20px;white-space:nowrap;text-align:center}
+.scan-hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:white;font-size:12px;padding:5px 12px;border-radius:20px;white-space:nowrap;text-align:center} :#btn-close-scan{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.55);color:white;border:none;font-size:18px;font-weight:700;cursor:pointer;z-index:5;display:flex;align-items:center;justify-content:center}
+#btn-close-scan:active{background:rgba(0,0,0,.75)}
 .btn-cancel-scan{width:100%;padding:12px;border:1.5px solid #ddd;border-radius:10px;background:white;color:#666;font-size:14px;cursor:pointer;margin-top:8px}
 
 #result-zone{display:none;background:#EBF2FB;border:1.5px solid #0F2850;border-radius:14px;padding:16px;margin:12px 0}
@@ -163,6 +164,7 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
   <div id="scanner-wrap">
     <video id="camVideo" playsinline autoplay muted></video>
     <canvas id="camCanvas"></canvas>
+    <button id="btn-close-scan" onclick="stopScan()" aria-label="Fermer">✕</button>
     <div class="scan-overlay">
       <div class="scan-frame">
         <div class="scan-corner sc-tl"></div>
