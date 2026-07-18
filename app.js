@@ -54,9 +54,10 @@ function setMode(mode) {
   currentMode = mode;
   stopScan();
   resetResultZone();
-
   document.getElementById('mbtn-p').className = 'mode-btn' + (mode === 'personnel' ? ' active-p' : '');
   document.getElementById('mbtn-m').className = 'mode-btn' + (mode === 'marchandise' ? ' active-m' : '');
+  document.getElementById('mbtn-rh').className = 'mode-btn' + (mode === 'asp-rh' ? ' active-p' : '');
+  document.getElementById('mbtn-cps').className = 'mode-btn' + (mode === 'cps-rh' ? ' active-p' : '');
   document.getElementById('pre-scan-m').style.display = mode === 'marchandise' ? 'block' : 'none';
   document.getElementById('scan-card-title').textContent = mode === 'marchandise' ? 'Scanner le carton' : 'Scanner le badge';
   document.getElementById('btn-scan-label').textContent = mode === 'marchandise' ? 'Scanner le carton' : 'Scanner le badge SSSM';
@@ -64,8 +65,9 @@ function setMode(mode) {
   document.getElementById('scan-hint').textContent = mode === 'marchandise' ? 'Centrer le DataMatrix / code-barres / QR' : 'Centrer le QR Code dans le cadre';
   document.getElementById('form-section-p').style.display = 'none';
   document.getElementById('form-section-m').style.display = 'none';
-  document.querySelector('.card').style.display = mode === 'asp-rh' ? 'none' : 'block';
+  document.querySelector('.card').style.display = (mode === 'asp-rh' || mode === 'cps-rh') ? 'none' : 'block';
   document.getElementById('asp-rh-panel').style.display = mode === 'asp-rh' ? 'block' : 'none';
+  document.getElementById('cps-rh-panel').style.display = mode === 'cps-rh' ? 'block' : 'none';
 }
 
 // ── SCANNER (caméra) ─────────────────────────────────────────────
