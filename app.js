@@ -139,10 +139,15 @@ function handleScan(raw, format) {
     return;
   }
 
+  // Interception CPS, prioritaire sur le mode courant
+  if (raw.startsWith(CPS_QR_PREFIX)) {
+    handleCPSScan(raw);
+    return;
+  }
+
   if (currentMode === 'personnel') handleBadgeScan(raw);
   else handleMerchScan(raw, format);
 }
-
 // ── TRAITEMENT BADGE (personnel) ────────────────────────────────
 function handleBadgeScan(raw) {
   const parts = raw.split('|');
