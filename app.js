@@ -680,3 +680,129 @@ function afficherErreurScanASP(message) {
   document.getElementById('res-service').textContent = '';
   document.getElementById('res-extra').textContent = '';
 }
+// ==================== MODULE CPS — PANNEAU RH ====================
+
+let cpsRechercheEnCours = false;
+
+async function rechercherSoldeCPS() {
+  const matricule = document.getElementById('cps-matricule').value.trim();
+  const infoBox = document.getElementById('cps-solde-info');
+  const absentBox = document.getElementById('cps-solde-absent');
+  const valeurSpan = document.getElementById('cps-solde-valeur');
+
+  infoBox.style.display = 'none';
+  absentBox.style.display = 'none';
+
+  if (!matricule || cpsRechercheEnCours) return;
+  cpsRechercheEnCours = true;
+
+  try {
+    const formula = encodeURIComponent(`{Matricule}='${matricule}'`);
+    const url = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CPS_SOLDES_TABLE)}?filterByFormula=${formula}`;
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}` }
+    });
+    if (!res.ok) throw new Error('recherche impossible');
+    const data = await res.json();
+
+    if (data.records && data.records.length > 0) {
+      const solde = data.records[0].fields.Droit_Calcule;
+      valeurSpan.textContent = (typeof solde === 'number') ? solde.toFixed(1) : '—';
+      infoBox.style.display = 'block';
+
+      // Pré-remplissage automatique du nom/service si disponibles
+      const nomEmploye = data.records[0].fields.Nom;
+      const serviceEmploye = data.records[0].fields.Service;
+      if (nomEmploye) document.getElementById('cps-nom').value = nomEmploye;
+      if (serviceEmploye) document.getElementById('cps-service').value = serviceEmploye;
+    } else {
+      absentBox.style.display = 'block';
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    cpsRechercheEnCours = false;
+  }
+}
+
+function genererIdCPS() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let suffix = '';
+  for (let i = 0; i < 6; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+  return 'cps_' + suffix;
+}
+
+async function genererCPS() {
+  const matricule = document.getElementById('cps-matricule').value.trim();
+  const nom = document.getElementById('cps-nom').value.trim();
+  const service = document.getElementById('cps-service').value;
+  const departPrevue = document.getElementById('cps-depart-prevue').value;
+  const retourPrevue = document.getElementById('cps-retour-prevue').value;
+  const autorisePar = document.getElementById('cps-autorise-par').value.trim();
+
+  if (!matricule || !nom || !service || !departPrevue || !retourPrevue || !autorisePar) {
+    alert('Veuillez remplir tous les champs.');
+    return;
+  }
+
+  const idCps = genererIdCPS();
+
+  const record = {
+    fields: {
+      "ID_CPS": idCps,
+      "Matricule": matricule,
+      "Nom": nom,
+      "Service": service,
+      "Date_Depart_Prevue": new Date(departPrevue).toISOString(),
+      "Date_Retour_Prevue": new Date(retourPrevue).toISOString(),
+      "Statut": CPS_STATUT.AUTORISE,
+      "Autorisé_par": autorisePar
+    }
+  };
+
+  try {
+    const response = await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CPS_CONGES_TABLE)}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(record)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText);
+    }
+
+    const qrContent = `${CPS_QR_PREFIX}MAT:${matricule}|ID:${idCps}`;
+    afficherQRCodeCPS(qrContent, idCps);
+
+  } catch (err) {
+    console.error(err);
+    alert('Erreur lors de la création du congé: ' + err.message);
+  }
+}
+
+function afficherQRCodeCPS(content, idCps) {
+  const container = document.getElementById('cps-qr-canvas');
+  container.innerHTML = '';
+  new QRCode(container, {
+    text: content,
+    width: 240,
+    height: 240
+  });
+  document.getElementById('cps-qr-id').textContent = 'ID: ' + idCps;
+  document.getElementById('cps-qr-result').style.display = 'block';
+}
+
+function resetCPSForm() {
+  document.getElementById('cps-matricule').value = '';
+  document.getElementById('cps-nom').value = '';
+  document.getElementById('cps-service').value = '';
+  document.getElementById('cps-depart-prevue').value = '';
+  document.getElementById('cps-retour-prevue').value = '';
+  document.getElementById('cps-solde-info').style.display = 'none';
+  document.getElementById('cps-solde-absent').style.display = 'none';
+  document.getElementById('cps-qr-result').style.display = 'none';
+}
