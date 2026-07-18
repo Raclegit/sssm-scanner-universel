@@ -38,3 +38,14 @@ const ASP_STATUT = {
   EXPIRE: "Expiré",
   ANNULE: "Annulé"
 };
+// --- Configuration CPS (Congé Personnel SALAMA) ---
+const CPS_CONGES_TABLE = "CPS_CONGES";
+const CPS_SOLDES_TABLE = "CPS_SOLDES";
+const CPS_QR_PREFIX = "CPS-SSSM|";
+
+const CPS_STATUT = {
+  AUTORISE: "Autorisé",
+  EN_CONGE: "En congé",
+  TERMINE: "Terminé",
+  ANNULE: "Annulé"
+};
