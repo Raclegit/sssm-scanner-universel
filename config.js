@@ -13,7 +13,7 @@
 // ════════════════════════════════════════════════════════════════
 const CONFIG = {
   AIRTABLE_API_KEY : "patQ1gk55HesrlVdd.191d124ae41cb7bf928e0b0f5629b2f533a14a8742f554e5874b329dd7d94b41",
-  AIRTABLE_BASE_ID : "appiu2JDZyyjFnNth",
+  AIRTABLE_BASE_ID : "app6zYqv0ltTz66",
   TABLE_SSSM       : "SSSM_MOUVEMENTS",
   TABLE_PERSONNEL  : "POINTAGES_PERSONNEL",
   TABLE_STOCK      : "SSSM_STOCK_MOUVEMENTS",
