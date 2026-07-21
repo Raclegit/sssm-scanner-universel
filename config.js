@@ -1,4 +1,4 @@
-// ═══ CONFIGURATION — MODIFIER CES VALEURS ════════════════════════
+nhoouni,lçkkok// ═══ CONFIGURATION — MODIFIER CES VALEURS ════════════════════════
 // 1. AIRTABLE_API_KEY / BASE_ID : déjà renseignés pour votre base.
 // 2. TABLE_SSSM : agents SSSM (AG/CL/MC) — une ligne par scan.
 //    Champs à créer : Code_Badge, Categorie, Role, Type_Mouvement,
