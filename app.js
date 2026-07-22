@@ -171,9 +171,7 @@ function handleScan(raw, format) {
   if (currentMode === 'personnel') handleBadgeScan(raw);
   else handleMerchScan(raw, format);
 }
-  if (currentMode === 'personnel') handleBadgeScan(raw);
-  else handleMerchScan(raw, format);
-}
+  
 // ── TRAITEMENT BADGE (personnel) ────────────────────────────────
 function handleBadgeScan(raw) {
   const parts = raw.split('|');
