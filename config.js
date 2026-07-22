@@ -49,3 +49,22 @@ const CPS_STATUT = {
   TERMINE: "Terminé",
   ANNULE: "Annulé"
 };
+// --- Configuration BSO (Bon de Sortie Objet) ---
+const BSO_TABLE = "BSO_SORTIES";
+const BSO_QR_PREFIX = "BSO-SSSM|";
+
+const BSO_STATUT = {
+  AUTORISE: "Autorisé",
+  SORTI: "Sorti",
+  RENTRE: "Rentré",
+  ANOMALIE: "Anomalie"
+};
+
+// --- Configuration DOP (Déclaration Objet Personnel) ---
+const DOP_TABLE = "DOP_DECLARATIONS";
+const DOP_QR_PREFIX = "DOP-SSSM|";
+
+const DOP_MOUVEMENT = {
+  ENTREE: "Entrée",
+  SORTIE: "Sortie"
+};
