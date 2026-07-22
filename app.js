@@ -1050,8 +1050,6 @@ function stopScanObjetBSO() {
 }
 
 async function rechercherASPPourBSO() {
-
-async function rechercherASPPourBSO() {
   const matricule = document.getElementById('bso-matricule').value.trim();
   const infoBox = document.getElementById('bso-asp-info');
   const absentBox = document.getElementById('bso-asp-absent');
