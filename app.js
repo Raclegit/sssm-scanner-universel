@@ -1010,7 +1010,9 @@ async function bsoObjTick() {
       try {
         const codes = await detector.detect(video);
         if (codes && codes.length > 0) {
-          document.getElementById('bso-code-objet').value = codes[0].rawValue;
+          const inputEl = document.getElementById('bso-code-objet');
+          inputEl.value = codes[0].rawValue;
+          inputEl.classList.add('field-scan-ok', 'success-anim');
           stopScanObjetBSO();
           if (navigator.vibrate) navigator.vibrate(80);
           bsoObjBusy = false;
@@ -1029,10 +1031,13 @@ async function bsoObjTick() {
       const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
       if (code) {
-        document.getElementById('bso-code-objet').value = code.data;
+        const inputEl = document.getElementById('bso-code-objet');
+        inputEl.value = code.data;
+        inputEl.classList.add('field-scan-ok', 'success-anim');
         stopScanObjetBSO();
         if (navigator.vibrate) navigator.vibrate(80);
         return;
+      }
       }
     }
   }
@@ -1110,12 +1115,13 @@ function ajouterObjetBSO() {
     typeSaisie: code ? 'Scan' : 'Manuel'
   });
 
-  document.getElementById('bso-code-objet').value = '';
+  const codeInput = document.getElementById('bso-code-objet');
+  codeInput.value = '';
+  codeInput.classList.remove('field-scan-ok', 'success-anim');
   document.getElementById('bso-description-objet').value = '';
 
   afficherListeObjetsBSO();
 }
-
 function retirerObjetBSO(index) {
   bsoListeObjets.splice(index, 1);
   afficherListeObjetsBSO();
