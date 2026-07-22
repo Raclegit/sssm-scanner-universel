@@ -313,6 +313,50 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
   </div>
 </div>
 
+<!-- ── PANNEAU DIRECTION — VALIDATION BSO ── -->
+<div id="bso-rh-panel" class="card" style="display:none">
+
+  <p class="card-title">Valider un Bon de Sortie Objet</p>
+
+  <input type="text" id="bso-matricule" placeholder="Matricule employé" style="width:100%;padding:10px;margin:6px 0;" oninput="rechercherASPPourBSO()">
+  <input type="text" id="bso-nom" placeholder="Nom complet" style="width:100%;padding:10px;margin:6px 0;" readonly>
+
+  <select id="bso-service" style="width:100%;padding:10px;margin:6px 0;">
+    <option value="">-- Service --</option>
+    <option value="DG">DG</option>
+    <option value="DAF">DAF</option>
+    <option value="DAS">DAS</option>
+    <option value="DVM">DVM</option>
+    <option value="PR">PR</option>
+    <option value="DSI">DSI</option>
+  </select>
+
+  <div id="bso-asp-info" style="display:none; background:#EAF6EA; border:1.5px solid #3AAA35; border-radius:10px; padding:12px; margin:10px 0; font-size:14px;">
+    <strong>ASP valide trouvée : <span id="bso-asp-id">—</span></strong>
+  </div>
+  <div id="bso-asp-absent" style="display:none; background:#FEF0F0; border:1.5px solid #E24B4A; border-radius:10px; padding:12px; margin:10px 0; font-size:13px; color:#C0392B;">
+    Aucune ASP valide trouvée pour ce matricule aujourd'hui. Le BSO ne peut pas être créé sans ASP.
+  </div>
+
+  <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
+
+  <p class="card-title">Objets à faire sortir</p>
+
+  <input type="text" id="bso-code-objet" placeholder="Code-barres (scanné ou tapé, optionnel)" style="width:100%;padding:10px;margin:6px 0;">
+  <input type="text" id="bso-description-objet" placeholder="Description de l'objet (ex: Ordinateur portable Dell)" style="width:100%;padding:10px;margin:6px 0;">
+  <button class="btn-scan" onclick="ajouterObjetBSO()" style="margin:6px 0; background:linear-gradient(135deg,#555,#333);">+ Ajouter à la liste</button>
+
+  <div id="bso-liste-objets" style="margin:14px 0;"></div>
+
+  <input type="text" id="bso-valide-par" placeholder="Votre nom (Directeur validant)" style="width:100%;padding:10px;margin:6px 0;">
+
+  <button class="btn-scan" onclick="validerBSO()" style="margin-top:10px;">Générer les QR Codes BSO</button>
+
+  <div id="bso-qr-result" style="display:none; margin-top:20px;"></div>
+
+  <button class="btn-scan" onclick="resetBSOForm()" style="display:none; margin-top:10px;" id="bso-btn-reset">Nouveau BSO</button>
+</div>
+
 <div class="card">
   <p class="card-title">Scans de la session</p>
 <div class="card">
