@@ -982,6 +982,71 @@ let bsoRechercheEnCours = false;
 let bsoASPValide = null; // stocke l'ID_ASP trouvé
 let bsoListeObjets = []; // liste des objets ajoutés avant validation
 
+// ── SCAN DÉDIÉ — CODE OBJET BSO (réutilise le détecteur déjà initialisé) ──
+let bsoObjStream = null;
+let bsoObjLoop = null;
+let bsoObjBusy = false;
+
+async function scanCodeObjetBSO() {
+  const wrap = document.getElementById('bso-scanner-wrap');
+  const video = document.getElementById('bsoCamVideo');
+  try {
+    bsoObjStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = bsoObjStream;
+    wrap.style.display = 'block';
+    bsoObjLoop = requestAnimationFrame(bsoObjTick);
+  } catch (e) {
+    alert('Caméra inaccessible. Vérifiez les autorisations dans Chrome.');
+  }
+}
+
+async function bsoObjTick() {
+  const video = document.getElementById('bsoCamVideo');
+  if (video.readyState === video.HAVE_ENOUGH_DATA && !bsoObjBusy) {
+    if (useNative && detector) {
+      bsoObjBusy = true;
+      try {
+        const codes = await detector.detect(video);
+        if (codes && codes.length > 0) {
+          document.getElementById('bso-code-objet').value = codes[0].rawValue;
+          stopScanObjetBSO();
+          if (navigator.vibrate) navigator.vibrate(80);
+          bsoObjBusy = false;
+          return;
+        }
+      } catch (e) { /* frame illisible, on continue */ }
+      bsoObjBusy = false;
+    } else {
+      // Fallback jsQR : QR codes uniquement, ne lira PAS un Code128 comme
+      // celui de l'étiquette S/N. Sur Android Chrome, useNative sera actif
+      // et ce fallback ne sera pas utilisé pour ce cas d'usage.
+      const canvas = document.getElementById('bsoCamCanvas');
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+      if (code) {
+        document.getElementById('bso-code-objet').value = code.data;
+        stopScanObjetBSO();
+        if (navigator.vibrate) navigator.vibrate(80);
+        return;
+      }
+    }
+  }
+  bsoObjLoop = requestAnimationFrame(bsoObjTick);
+}
+
+function stopScanObjetBSO() {
+  cancelAnimationFrame(bsoObjLoop);
+  if (bsoObjStream) { bsoObjStream.getTracks().forEach(t => t.stop()); bsoObjStream = null; }
+  document.getElementById('bso-scanner-wrap').style.display = 'none';
+}
+
+async function rechercherASPPourBSO() {
+
 async function rechercherASPPourBSO() {
   const matricule = document.getElementById('bso-matricule').value.trim();
   const infoBox = document.getElementById('bso-asp-info');
