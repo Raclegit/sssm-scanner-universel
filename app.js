@@ -968,3 +968,220 @@ function afficherErreurScanCPS(message) {
   document.getElementById('res-service').textContent = '';
   document.getElementById('res-extra').textContent = '';
 }
+// ==================== MODULE BSO — PANNEAU DIRECTION ====================
+
+let bsoRechercheEnCours = false;
+let bsoASPValide = null; // stocke l'ID_ASP trouvé
+let bsoListeObjets = []; // liste des objets ajoutés avant validation
+
+async function rechercherASPPourBSO() {
+  const matricule = document.getElementById('bso-matricule').value.trim();
+  const infoBox = document.getElementById('bso-asp-info');
+  const absentBox = document.getElementById('bso-asp-absent');
+  const idSpan = document.getElementById('bso-asp-id');
+
+  infoBox.style.display = 'none';
+  absentBox.style.display = 'none';
+  bsoASPValide = null;
+
+  if (!matricule || bsoRechercheEnCours) return;
+  bsoRechercheEnCours = true;
+
+  try {
+    // Recherche une ASP de ce matricule dont le statut est Autorisé ou Sorti (donc "active" aujourd'hui)
+    const formula = encodeURIComponent(`AND({Matricule}='${matricule}', OR({Statut}='${ASP_STATUT.AUTORISE}', {Statut}='${ASP_STATUT.SORTI}'))`);
+    const url = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(ASP_TABLE)}?filterByFormula=${formula}&sort%5B0%5D%5Bfield%5D=Date_Creation&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=1`;
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}` }
+    });
+    if (!res.ok) throw new Error('recherche impossible');
+    const data = await res.json();
+
+    if (data.records && data.records.length > 0) {
+      const asp = data.records[0].fields;
+      bsoASPValide = asp.ID_ASP;
+      idSpan.textContent = asp.ID_ASP;
+      infoBox.style.display = 'block';
+
+      if (asp.Nom) document.getElementById('bso-nom').value = asp.Nom;
+      if (asp.Service) document.getElementById('bso-service').value = asp.Service;
+    } else {
+      absentBox.style.display = 'block';
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    bsoRechercheEnCours = false;
+  }
+}
+
+function genererIdBSO() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let suffix = '';
+  for (let i = 0; i < 6; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+  return 'bso_' + suffix;
+}
+
+function ajouterObjetBSO() {
+  const code = document.getElementById('bso-code-objet').value.trim();
+  const description = document.getElementById('bso-description-objet').value.trim();
+
+  if (!description) {
+    alert('Veuillez renseigner au moins une description pour l\'objet.');
+    return;
+  }
+
+  bsoListeObjets.push({
+    code: code,
+    description: description,
+    typeSaisie: code ? 'Scan' : 'Manuel'
+  });
+
+  document.getElementById('bso-code-objet').value = '';
+  document.getElementById('bso-description-objet').value = '';
+
+  afficherListeObjetsBSO();
+}
+
+function retirerObjetBSO(index) {
+  bsoListeObjets.splice(index, 1);
+  afficherListeObjetsBSO();
+}
+
+function afficherListeObjetsBSO() {
+  const container = document.getElementById('bso-liste-objets');
+  if (bsoListeObjets.length === 0) {
+    container.innerHTML = '<p style="color:#aaa;font-size:13px;text-align:center;padding:10px 0">Aucun objet ajouté</p>';
+    return;
+  }
+
+  container.innerHTML = bsoListeObjets.map((obj, i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#f5f5f5;border-radius:8px;padding:10px 12px;margin-bottom:6px;">
+      <div>
+        <div style="font-weight:600;font-size:14px;">${obj.description}</div>
+        <div style="font-size:12px;color:#888;">${obj.code ? 'Code: ' + obj.code : 'Saisie manuelle'}</div>
+      </div>
+      <button onclick="retirerObjetBSO(${i})" style="background:none;border:none;color:#C0392B;font-size:18px;cursor:pointer;padding:4px 10px;">✕</button>
+    </div>
+  `).join('');
+}
+
+async function validerBSO() {
+  const matricule = document.getElementById('bso-matricule').value.trim();
+  const nom = document.getElementById('bso-nom').value.trim();
+  const service = document.getElementById('bso-service').value;
+  const validePar = document.getElementById('bso-valide-par').value.trim();
+
+  if (!bsoASPValide) {
+    alert('Aucune ASP valide trouvée pour ce matricule. Le BSO ne peut pas être créé.');
+    return;
+  }
+  if (!matricule || !nom || !service || !validePar) {
+    alert('Veuillez remplir tous les champs (matricule, nom, service, votre nom).');
+    return;
+  }
+  if (bsoListeObjets.length === 0) {
+    alert('Veuillez ajouter au moins un objet à la liste.');
+    return;
+  }
+
+  const qrContainer = document.getElementById('bso-qr-result');
+  qrContainer.innerHTML = '<p style="text-align:center;color:#888;">Génération en cours...</p>';
+  qrContainer.style.display = 'block';
+
+  const qrCodesGeneres = [];
+
+  try {
+    for (const objet of bsoListeObjets) {
+      const idBso = genererIdBSO();
+
+      const record = {
+        fields: {
+          "ID_BSO": idBso,
+          "ID_ASP_Associe": bsoASPValide,
+          "Matricule": matricule,
+          "Nom": nom,
+          "Service": service,
+          "Code_Objet": objet.code || "",
+          "Description_Objet": objet.description,
+          "Type_Saisie": objet.typeSaisie,
+          "Valide_par": validePar,
+          "Statut": BSO_STATUT.AUTORISE
+        }
+      };
+
+      const response = await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(BSO_TABLE)}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(record)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText);
+      }
+
+      const qrContent = `${BSO_QR_PREFIX}MAT:${matricule}|ID:${idBso}`;
+      qrCodesGeneres.push({ idBso, description: objet.description, qrContent });
+    }
+
+    afficherQRCodesBSO(qrCodesGeneres);
+
+  } catch (err) {
+    console.error(err);
+    alert('Erreur lors de la création du BSO: ' + err.message);
+  }
+}
+
+function afficherQRCodesBSO(listeQR) {
+  const container = document.getElementById('bso-qr-result');
+  container.innerHTML = '';
+
+  listeQR.forEach(item => {
+    const bloc = document.createElement('div');
+    bloc.style.cssText = 'text-align:center; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid #eee;';
+
+    const titre = document.createElement('p');
+    titre.style.cssText = 'font-weight:600; margin-bottom:8px;';
+    titre.textContent = item.description;
+    bloc.appendChild(titre);
+
+    const qrDiv = document.createElement('div');
+    bloc.appendChild(qrDiv);
+
+    const idLabel = document.createElement('p');
+    idLabel.style.cssText = 'font-size:12px; color:#888; margin-top:6px;';
+    idLabel.textContent = 'ID: ' + item.idBso;
+    bloc.appendChild(idLabel);
+
+    container.appendChild(bloc);
+
+    new QRCode(qrDiv, {
+      text: item.qrContent,
+      width: 200,
+      height: 200
+    });
+  });
+
+  document.getElementById('bso-btn-reset').style.display = 'block';
+}
+
+function resetBSOForm() {
+  document.getElementById('bso-matricule').value = '';
+  document.getElementById('bso-nom').value = '';
+  document.getElementById('bso-service').value = '';
+  document.getElementById('bso-valide-par').value = '';
+  document.getElementById('bso-code-objet').value = '';
+  document.getElementById('bso-description-objet').value = '';
+  document.getElementById('bso-asp-info').style.display = 'none';
+  document.getElementById('bso-asp-absent').style.display = 'none';
+  document.getElementById('bso-qr-result').style.display = 'none';
+  document.getElementById('bso-qr-result').innerHTML = '';
+  document.getElementById('bso-btn-reset').style.display = 'none';
+  bsoASPValide = null;
+  bsoListeObjets = [];
+  afficherListeObjetsBSO();
+}
