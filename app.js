@@ -167,7 +167,9 @@ function handleScan(raw, format) {
     handleBSOScan(raw);
     return;
   }
-
+if (currentMode === 'personnel') handleBadgeScan(raw);
+  else handleMerchScan(raw, format);
+}
   if (currentMode === 'personnel') handleBadgeScan(raw);
   else handleMerchScan(raw, format);
 }
