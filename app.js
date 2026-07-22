@@ -1038,7 +1038,6 @@ async function bsoObjTick() {
         if (navigator.vibrate) navigator.vibrate(80);
         return;
       }
-      }
     }
   }
   bsoObjLoop = requestAnimationFrame(bsoObjTick);
