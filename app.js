@@ -147,7 +147,30 @@ function handleScan(raw, format) {
     handleCPSScan(raw);
     return;
   }
+function handleScan(raw, format) {
+  stopScan();
 
+  // Interception ASP, prioritaire sur le mode courant
+  if (raw.startsWith(ASP_QR_PREFIX)) {
+    handleASPScan(raw);
+    return;
+  }
+
+  // Interception CPS, prioritaire sur le mode courant
+  if (raw.startsWith(CPS_QR_PREFIX)) {
+    handleCPSScan(raw);
+    return;
+  }
+
+  // Interception BSO, prioritaire sur le mode courant
+  if (raw.startsWith(BSO_QR_PREFIX)) {
+    handleBSOScan(raw);
+    return;
+  }
+
+  if (currentMode === 'personnel') handleBadgeScan(raw);
+  else handleMerchScan(raw, format);
+}
   if (currentMode === 'personnel') handleBadgeScan(raw);
   else handleMerchScan(raw, format);
 }
