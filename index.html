@@ -140,6 +140,9 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
   <button class="mode-btn" id="mbtn-bso" onclick="setMode('bso-rh')">
   💼 Direction — BSO
 </button>
+  <button class="mode-btn" id="mbtn-dop" onclick="setMode('dop-rh')">
+  🎒 Personnel — DOP
+</button>
 </div>
 
 <div id="detector-warning" class="warn-box" style="display:none">
@@ -270,7 +273,6 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
     </div>
   </div>
 </div>
-</div>
 
 <!-- ── PANNEAU RH — CONGÉS (CPS) ── -->
 <div id="cps-rh-panel" class="card" style="display:none">
@@ -366,8 +368,59 @@ header{background:#0F2850;color:white;padding:12px 16px;display:flex;align-items
   <button class="btn-scan" onclick="resetBSOForm()" style="display:none; margin-top:10px;" id="bso-btn-reset">Nouveau BSO</button>
 </div>
 
-<div class="card">
-  <p class="card-title">Scans de la session</p>
+<!-- ── PANNEAU RH — DÉCLARATION DOP (Objets Personnels) ── -->
+<div id="dop-rh-panel" class="card" style="display:none">
+
+  <p class="card-title">Déclarer des biens personnels</p>
+  <p style="font-size:12.5px;color:#888;margin:-6px 0 12px">Distingue les biens de l'entreprise des effets personnels du personnel — à déclarer à l'entrée comme à la sortie, pour éviter toute ambiguïté en cas de vol ou de disparition.</p>
+
+  <input type="text" id="dop-matricule" placeholder="Matricule employé / agent" style="width:100%;padding:10px;margin:6px 0;" oninput="rechercherPersonnelPourDOP()">
+  <input type="text" id="dop-nom" placeholder="Nom complet" style="width:100%;padding:10px;margin:6px 0;">
+
+  <select id="dop-service" style="width:100%;padding:10px;margin:6px 0;">
+    <option value="">-- Service --</option>
+    <option value="DG">DG</option>
+    <option value="DAF">DAF</option>
+    <option value="DAS">DAS</option>
+    <option value="DVM">DVM</option>
+    <option value="PR">PR</option>
+    <option value="DSI">DSI</option>
+    <option value="SSSM">SSSM</option>
+  </select>
+
+  <label style="display:block;font-size:13px;font-weight:600;color:#555;margin:10px 0 4px">Sens du mouvement</label>
+  <div class="type-btns">
+    <button type="button" class="type-btn selected-in" id="dop-sens-entree" onclick="selectionnerSensDOP('Entrée')">↓ Entrée</button>
+    <button type="button" class="type-btn" id="dop-sens-sortie" onclick="selectionnerSensDOP('Sortie')">↑ Sortie</button>
+  </div>
+
+  <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
+
+  <p class="card-title">Biens personnels concernés</p>
+
+  <div style="display:flex; gap:8px; margin:6px 0;">
+    <input type="text" id="dop-code-objet" placeholder="Code-barres (scanné ou tapé, optionnel)" style="flex:1;padding:10px;" oninput="this.classList.remove('field-scan-ok')">
+    <button type="button" onclick="scanCodeObjetDOP()" style="padding:0 16px;border:none;border-radius:8px;background:linear-gradient(135deg,#555,#333);color:#fff;font-size:18px;cursor:pointer;">📷</button>
+  </div>
+  <div id="dop-scanner-wrap" style="display:none;position:relative;border-radius:14px;overflow:hidden;background:#000;margin:6px 0;">
+    <video id="dopCamVideo" playsinline autoplay muted style="width:100%;max-height:50vw;display:block;object-fit:cover"></video>
+    <canvas id="dopCamCanvas" style="display:none"></canvas>
+    <button type="button" onclick="stopScanObjetDOP()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:13px;">Annuler</button>
+  </div>
+  <input type="text" id="dop-description-objet" placeholder="Description du bien (ex: Ordinateur portable personnel HP)" style="width:100%;padding:10px;margin:6px 0;">
+  <button class="btn-scan" onclick="ajouterObjetDOP()" style="margin:6px 0; background:linear-gradient(135deg,#555,#333);">+ Ajouter à la liste</button>
+
+  <div id="dop-liste-objets" style="margin:14px 0;"></div>
+
+  <input type="text" id="dop-declare-par" placeholder="Votre nom (agent SSSM validant)" style="width:100%;padding:10px;margin:6px 0;">
+
+  <button class="btn-scan" onclick="validerDOP()" style="margin-top:10px;">Générer les QR Codes DOP</button>
+
+  <div id="dop-qr-result" style="display:none; margin-top:20px;"></div>
+
+  <button class="btn-scan" onclick="resetDOPForm()" style="display:none; margin-top:10px;" id="dop-btn-reset">Nouvelle déclaration</button>
+</div>
+
 <div class="card">
   <p class="card-title">Scans de la session</p>
   <div id="history-list"><p style="color:#aaa;font-size:13px;text-align:center;padding:16px 0">Aucun scan enregistré</p></div>

@@ -59,6 +59,7 @@ selectedEtape = CONFIG.ETAPE_OPTIONS[0];
   document.getElementById('mbtn-rh').className = 'mode-btn' + (mode === 'asp-rh' ? ' active-p' : '');
   document.getElementById('mbtn-cps').className = 'mode-btn' + (mode === 'cps-rh' ? ' active-p' : '');
   document.getElementById('mbtn-bso').className = 'mode-btn' + (mode === 'bso-rh' ? ' active-p' : '');
+  document.getElementById('mbtn-dop').className = 'mode-btn' + (mode === 'dop-rh' ? ' active-p' : '');
   document.getElementById('pre-scan-m').style.display = mode === 'marchandise' ? 'block' : 'none';
   document.getElementById('scan-card-title').textContent = mode === 'marchandise' ? 'Scanner le carton' : 'Scanner le badge';
   document.getElementById('btn-scan-label').textContent = mode === 'marchandise' ? 'Scanner le carton' : 'Scanner le badge SSSM';
@@ -66,11 +67,12 @@ selectedEtape = CONFIG.ETAPE_OPTIONS[0];
   document.getElementById('scan-hint').textContent = mode === 'marchandise' ? 'Centrer le DataMatrix / code-barres / QR' : 'Centrer le QR Code dans le cadre';
   document.getElementById('form-section-p').style.display = 'none';
   document.getElementById('form-section-m').style.display = 'none';
-  const rhModes = ['asp-rh', 'cps-rh', 'bso-rh'];
+  const rhModes = ['asp-rh', 'cps-rh', 'bso-rh', 'dop-rh'];
   document.querySelector('.card').style.display = rhModes.includes(mode) ? 'none' : 'block';
   document.getElementById('asp-rh-panel').style.display = mode === 'asp-rh' ? 'block' : 'none';
   document.getElementById('cps-rh-panel').style.display = mode === 'cps-rh' ? 'block' : 'none';
   document.getElementById('bso-rh-panel').style.display = mode === 'bso-rh' ? 'block' : 'none';
+  document.getElementById('dop-rh-panel').style.display = mode === 'dop-rh' ? 'block' : 'none';
 }
 
 // ── SCANNER (caméra) ─────────────────────────────────────────────
@@ -152,6 +154,12 @@ function handleScan(raw, format) {
   // Interception BSO, prioritaire sur le mode courant
   if (raw.startsWith(BSO_QR_PREFIX)) {
     handleBSOScan(raw);
+    return;
+  }
+
+  // Interception DOP, prioritaire sur le mode courant
+  if (raw.startsWith(DOP_QR_PREFIX)) {
+    handleDOPScan(raw);
     return;
   }
 
@@ -1260,4 +1268,486 @@ function resetBSOForm() {
   bsoASPValide = null;
   bsoListeObjets = [];
   afficherListeObjetsBSO();
+}
+
+// ==================== TRAITEMENT SCAN BSO (poste de garde) ====================
+// NB : cette fonction était appelée depuis handleScan() mais n'existait pas —
+// un QR BSO généré ne pouvait donc pas être revalidé à la sortie/au retour.
+
+let bsoScanEnCours = false;
+
+async function handleBSOScan(raw) {
+  if (bsoScanEnCours) return;
+  bsoScanEnCours = true;
+
+  try {
+    const parts = raw.split('|');
+    const idBso = parts[2]?.split(':')[1];
+
+    const rz = document.getElementById('result-zone');
+    rz.style.display = 'block';
+
+    if (!idBso) {
+      afficherErreurScanBSO('QR BSO invalide');
+      return;
+    }
+
+    const formula = encodeURIComponent(`{ID_BSO}='${idBso}'`);
+    const searchUrl = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(BSO_TABLE)}?filterByFormula=${formula}`;
+    const searchResp = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}` }
+    });
+    if (!searchResp.ok) throw new Error('recherche impossible (HTTP ' + searchResp.status + ')');
+    const searchData = await searchResp.json();
+
+    if (!searchData.records || searchData.records.length === 0) {
+      afficherErreurScanBSO('BSO introuvable');
+      return;
+    }
+
+    const record = searchData.records[0];
+    const statutActuel = record.fields.Statut;
+    const now = new Date().toISOString();
+
+    if (statutActuel === BSO_STATUT.AUTORISE) {
+      await mettreAJourBSO(record.id, {
+        "Date_Heure_Sortie": now,
+        "Statut": BSO_STATUT.SORTI
+      });
+      record.fields.Statut = BSO_STATUT.SORTI;
+      afficherSuccesScanBSO(record, 'sortie');
+
+    } else if (statutActuel === BSO_STATUT.SORTI) {
+      await mettreAJourBSO(record.id, {
+        "Date_Heure_Retour": now,
+        "Statut": BSO_STATUT.RENTRE
+      });
+      record.fields.Statut = BSO_STATUT.RENTRE;
+      afficherSuccesScanBSO(record, 'retour');
+
+    } else {
+      afficherErreurScanBSO(`BSO déjà utilisé (statut: ${statutActuel})`);
+    }
+
+  } catch (err) {
+    console.error(err);
+    afficherErreurScanBSO("Erreur lors du traitement du BSO");
+  } finally {
+    bsoScanEnCours = false;
+  }
+}
+
+async function mettreAJourBSO(recordId, fields) {
+  const resp = await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(BSO_TABLE)}/${recordId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ fields })
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(errText);
+  }
+}
+
+function afficherSuccesScanBSO(record, typeAction) {
+  const rz = document.getElementById('result-zone');
+  rz.style.display = 'block';
+  rz.className = '';
+  rz.classList.add('success-anim');
+
+  document.getElementById('res-label-top').textContent =
+    typeAction === 'sortie' ? 'BSO — Sortie enregistrée' : 'BSO — Retour enregistré';
+
+  document.getElementById('res-matricule').textContent = 'N° ' + record.fields.Matricule;
+  document.getElementById('res-matricule').className = 'res-value success-anim';
+  document.getElementById('res-nom').textContent = record.fields.Nom;
+  document.getElementById('res-service').textContent = record.fields.Description_Objet || '';
+  document.getElementById('res-extra').textContent = `→ ${BSO_TABLE}`;
+}
+
+function afficherErreurScanBSO(message) {
+  const rz = document.getElementById('result-zone');
+  rz.style.display = 'block';
+  rz.className = '';
+
+  document.getElementById('res-label-top').textContent = 'BSO — Erreur';
+  document.getElementById('res-matricule').textContent = '—';
+  document.getElementById('res-nom').textContent = message;
+  document.getElementById('res-service').textContent = '';
+  document.getElementById('res-extra').textContent = '';
+}
+
+// ==================== MODULE DOP — DÉCLARATION OBJETS PERSONNELS ====================
+// Distingue les biens de l'entreprise des effets personnels du personnel :
+// toute déclaration génère un QR par bien, re-scannable à chaque passage pour
+// basculer son mouvement entre Entrée et Sortie (traçabilité complète).
+
+let dopSensSelectionne = DOP_MOUVEMENT.ENTREE;
+let dopListeObjets = [];
+let dopRechercheEnCours = false;
+
+function selectionnerSensDOP(sens) {
+  dopSensSelectionne = (sens === 'Sortie') ? DOP_MOUVEMENT.SORTIE : DOP_MOUVEMENT.ENTREE;
+  document.getElementById('dop-sens-entree').className = 'type-btn' + (dopSensSelectionne === DOP_MOUVEMENT.ENTREE ? ' selected-in' : '');
+  document.getElementById('dop-sens-sortie').className = 'type-btn' + (dopSensSelectionne === DOP_MOUVEMENT.SORTIE ? ' selected-out' : '');
+}
+
+async function rechercherPersonnelPourDOP() {
+  const matricule = document.getElementById('dop-matricule').value.trim();
+  if (!matricule || dopRechercheEnCours) return;
+  dopRechercheEnCours = true;
+
+  try {
+    const formula = encodeURIComponent(`{Matricule}='${matricule}'`);
+    const url = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(CONFIG.TABLE_PERSONNEL)}?filterByFormula=${formula}&maxRecords=1`;
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.records && data.records.length > 0) {
+      const nomEmploye = data.records[0].fields.Nom;
+      const serviceEmploye = data.records[0].fields.Service;
+      if (nomEmploye) document.getElementById('dop-nom').value = nomEmploye;
+      if (serviceEmploye) document.getElementById('dop-service').value = serviceEmploye;
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    dopRechercheEnCours = false;
+  }
+}
+
+// ── SCAN DÉDIÉ — CODE OBJET DOP (réutilise le détecteur déjà initialisé) ──
+let dopObjStream = null;
+let dopObjLoop = null;
+let dopObjBusy = false;
+
+async function scanCodeObjetDOP() {
+  const wrap = document.getElementById('dop-scanner-wrap');
+  const video = document.getElementById('dopCamVideo');
+  try {
+    dopObjStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = dopObjStream;
+    wrap.style.display = 'block';
+    dopObjLoop = requestAnimationFrame(dopObjTick);
+  } catch (e) {
+    alert('Caméra inaccessible. Vérifiez les autorisations dans Chrome.');
+  }
+}
+
+async function dopObjTick() {
+  const video = document.getElementById('dopCamVideo');
+  if (video.readyState === video.HAVE_ENOUGH_DATA && !dopObjBusy) {
+    if (useNative && detector) {
+      dopObjBusy = true;
+      try {
+        const codes = await detector.detect(video);
+        if (codes && codes.length > 0) {
+          const inputEl = document.getElementById('dop-code-objet');
+          inputEl.value = codes[0].rawValue;
+          inputEl.classList.add('field-scan-ok', 'success-anim');
+          stopScanObjetDOP();
+          if (navigator.vibrate) navigator.vibrate(80);
+          dopObjBusy = false;
+          return;
+        }
+      } catch (e) { /* frame illisible, on continue */ }
+      dopObjBusy = false;
+    } else {
+      // Fallback jsQR : QR codes uniquement (ne lit pas les Code128).
+      const canvas = document.getElementById('dopCamCanvas');
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+      if (code) {
+        const inputEl = document.getElementById('dop-code-objet');
+        inputEl.value = code.data;
+        inputEl.classList.add('field-scan-ok', 'success-anim');
+        stopScanObjetDOP();
+        if (navigator.vibrate) navigator.vibrate(80);
+        return;
+      }
+    }
+  }
+  dopObjLoop = requestAnimationFrame(dopObjTick);
+}
+
+function stopScanObjetDOP() {
+  cancelAnimationFrame(dopObjLoop);
+  if (dopObjStream) { dopObjStream.getTracks().forEach(t => t.stop()); dopObjStream = null; }
+  document.getElementById('dop-scanner-wrap').style.display = 'none';
+}
+
+function ajouterObjetDOP() {
+  const code = document.getElementById('dop-code-objet').value.trim();
+  const description = document.getElementById('dop-description-objet').value.trim();
+
+  if (!description) {
+    alert('Veuillez renseigner au moins une description pour le bien.');
+    return;
+  }
+
+  dopListeObjets.push({
+    code: code,
+    description: description,
+    typeSaisie: code ? 'Scan' : 'Manuel'
+  });
+
+  const codeInput = document.getElementById('dop-code-objet');
+  codeInput.value = '';
+  codeInput.classList.remove('field-scan-ok', 'success-anim');
+  document.getElementById('dop-description-objet').value = '';
+
+  afficherListeObjetsDOP();
+}
+
+function retirerObjetDOP(index) {
+  dopListeObjets.splice(index, 1);
+  afficherListeObjetsDOP();
+}
+
+function afficherListeObjetsDOP() {
+  const container = document.getElementById('dop-liste-objets');
+  if (dopListeObjets.length === 0) {
+    container.innerHTML = '<p style="color:#aaa;font-size:13px;text-align:center;padding:10px 0">Aucun bien ajouté</p>';
+    return;
+  }
+
+  container.innerHTML = dopListeObjets.map((obj, i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#f5f5f5;border-radius:8px;padding:10px 12px;margin-bottom:6px;">
+      <div>
+        <div style="font-weight:600;font-size:14px;">${obj.description}</div>
+        <div style="font-size:12px;color:#888;">${obj.code ? 'Code: ' + obj.code : 'Saisie manuelle'}</div>
+      </div>
+      <button onclick="retirerObjetDOP(${i})" style="background:none;border:none;color:#C0392B;font-size:18px;cursor:pointer;padding:4px 10px;">✕</button>
+    </div>
+  `).join('');
+}
+
+function genererIdDOP() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let suffix = '';
+  for (let i = 0; i < 6; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+  return 'dop_' + suffix;
+}
+
+async function validerDOP() {
+  const matricule = document.getElementById('dop-matricule').value.trim();
+  const nom = document.getElementById('dop-nom').value.trim();
+  const service = document.getElementById('dop-service').value;
+  const declarePar = document.getElementById('dop-declare-par').value.trim();
+
+  if (!matricule || !nom || !service || !declarePar) {
+    alert('Veuillez remplir tous les champs (matricule, nom, service, votre nom).');
+    return;
+  }
+  if (dopListeObjets.length === 0) {
+    alert('Veuillez ajouter au moins un bien à la liste.');
+    return;
+  }
+
+  const qrContainer = document.getElementById('dop-qr-result');
+  qrContainer.innerHTML = '<p style="text-align:center;color:#888;">Génération en cours...</p>';
+  qrContainer.style.display = 'block';
+
+  const qrCodesGeneres = [];
+
+  try {
+    for (const objet of dopListeObjets) {
+      const idDop = genererIdDOP();
+      const now = new Date().toISOString();
+
+      const record = {
+        fields: {
+          "ID_DOP": idDop,
+          "Matricule": matricule,
+          "Nom": nom,
+          "Service": service,
+          "Description_Bien": objet.description,
+          "Code_Objet": objet.code || "",
+          "Type_Saisie": objet.typeSaisie,
+          "Mouvement": dopSensSelectionne,
+          "Declare_par": declarePar,
+          "Date_Heure_Declaration": now
+        }
+      };
+
+      const response = await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(DOP_TABLE)}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(record)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText);
+      }
+
+      const qrContent = `${DOP_QR_PREFIX}MAT:${matricule}|ID:${idDop}`;
+      qrCodesGeneres.push({ idDop, description: objet.description, qrContent });
+    }
+
+    afficherQRCodesDOP(qrCodesGeneres);
+
+  } catch (err) {
+    console.error(err);
+    alert('Erreur lors de la création de la déclaration DOP : ' + err.message);
+  }
+}
+
+function afficherQRCodesDOP(listeQR) {
+  const container = document.getElementById('dop-qr-result');
+  container.innerHTML = '';
+
+  listeQR.forEach(item => {
+    const bloc = document.createElement('div');
+    bloc.style.cssText = 'text-align:center; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid #eee;';
+
+    const titre = document.createElement('p');
+    titre.style.cssText = 'font-weight:600; margin-bottom:8px;';
+    titre.textContent = item.description;
+    bloc.appendChild(titre);
+
+    const qrDiv = document.createElement('div');
+    bloc.appendChild(qrDiv);
+
+    const idLabel = document.createElement('p');
+    idLabel.style.cssText = 'font-size:12px; color:#888; margin-top:6px;';
+    idLabel.textContent = 'ID: ' + item.idDop;
+    bloc.appendChild(idLabel);
+
+    container.appendChild(bloc);
+
+    new QRCode(qrDiv, {
+      text: item.qrContent,
+      width: 200,
+      height: 200
+    });
+  });
+
+  document.getElementById('dop-btn-reset').style.display = 'block';
+}
+
+function resetDOPForm() {
+  document.getElementById('dop-matricule').value = '';
+  document.getElementById('dop-nom').value = '';
+  document.getElementById('dop-service').value = '';
+  document.getElementById('dop-declare-par').value = '';
+  const codeInput = document.getElementById('dop-code-objet');
+  codeInput.value = '';
+  codeInput.classList.remove('field-scan-ok', 'success-anim');
+  document.getElementById('dop-description-objet').value = '';
+  document.getElementById('dop-qr-result').style.display = 'none';
+  document.getElementById('dop-qr-result').innerHTML = '';
+  document.getElementById('dop-btn-reset').style.display = 'none';
+  dopListeObjets = [];
+  selectionnerSensDOP('Entrée');
+  afficherListeObjetsDOP();
+}
+
+// ==================== TRAITEMENT SCAN DOP (poste de garde) ====================
+
+let dopScanEnCours = false;
+
+async function handleDOPScan(raw) {
+  if (dopScanEnCours) return;
+  dopScanEnCours = true;
+
+  try {
+    const parts = raw.split('|');
+    const idDop = parts[2]?.split(':')[1];
+
+    const rz = document.getElementById('result-zone');
+    rz.style.display = 'block';
+
+    if (!idDop) {
+      afficherErreurScanDOP('QR DOP invalide');
+      return;
+    }
+
+    const formula = encodeURIComponent(`{ID_DOP}='${idDop}'`);
+    const searchUrl = `https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(DOP_TABLE)}?filterByFormula=${formula}`;
+    const searchResp = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}` }
+    });
+    if (!searchResp.ok) throw new Error('recherche impossible (HTTP ' + searchResp.status + ')');
+    const searchData = await searchResp.json();
+
+    if (!searchData.records || searchData.records.length === 0) {
+      afficherErreurScanDOP('Déclaration DOP introuvable');
+      return;
+    }
+
+    const record = searchData.records[0];
+    const mouvementActuel = record.fields.Mouvement;
+    const now = new Date().toISOString();
+    const nouveauMouvement = (mouvementActuel === DOP_MOUVEMENT.ENTREE) ? DOP_MOUVEMENT.SORTIE : DOP_MOUVEMENT.ENTREE;
+
+    await mettreAJourDOP(record.id, {
+      "Mouvement": nouveauMouvement,
+      "Date_Heure_Dernier_Scan": now
+    });
+    record.fields.Mouvement = nouveauMouvement;
+    afficherSuccesScanDOP(record);
+
+  } catch (err) {
+    console.error(err);
+    afficherErreurScanDOP("Erreur lors du traitement de la déclaration DOP");
+  } finally {
+    dopScanEnCours = false;
+  }
+}
+
+async function mettreAJourDOP(recordId, fields) {
+  const resp = await fetch(`https://api.airtable.com/v0/${CONFIG.AIRTABLE_BASE_ID}/${encodeURIComponent(DOP_TABLE)}/${recordId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${CONFIG.AIRTABLE_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ fields })
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(errText);
+  }
+}
+
+function afficherSuccesScanDOP(record) {
+  const rz = document.getElementById('result-zone');
+  rz.style.display = 'block';
+  rz.className = '';
+  rz.classList.add('success-anim');
+
+  document.getElementById('res-label-top').textContent =
+    record.fields.Mouvement === DOP_MOUVEMENT.SORTIE ? 'DOP — Sortie du bien enregistrée' : 'DOP — Entrée du bien enregistrée';
+
+  document.getElementById('res-matricule').textContent = 'N° ' + record.fields.Matricule;
+  document.getElementById('res-matricule').className = 'res-value success-anim';
+  document.getElementById('res-nom').textContent = record.fields.Nom;
+  document.getElementById('res-service').textContent = record.fields.Description_Bien || '';
+  document.getElementById('res-extra').textContent = `Bien personnel  ·  → ${DOP_TABLE}`;
+}
+
+function afficherErreurScanDOP(message) {
+  const rz = document.getElementById('result-zone');
+  rz.style.display = 'block';
+  rz.className = '';
+
+  document.getElementById('res-label-top').textContent = 'DOP — Erreur';
+  document.getElementById('res-matricule').textContent = '—';
+  document.getElementById('res-nom').textContent = message;
+  document.getElementById('res-service').textContent = '';
+  document.getElementById('res-extra').textContent = '';
 }
